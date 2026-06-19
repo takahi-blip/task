@@ -160,12 +160,17 @@ const STATUS_ORDER = {doing:0, todo:1, hold:2, done:3};
 function uid(){ return 't' + Date.now() + Math.random().toString(36).slice(2,8); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbwMw4iNXwq_ALnc8-wY42NId1Du0g9NZhZaqJIGmduAwM9ZVojoSG7LeVLP0yQKeI2H/exec';
+
 async function loadTasks(){
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    tasks = raw ? JSON.parse(raw) : [];
+    const res = await fetch(SHEET_API_URL);
+    const text = await res.text();
+    tasks = text ? JSON.parse(text) : [];
   }catch(e){
+    console.error('load failed', e);
     tasks = [];
+    alert('データの読み込みに失敗しました。スプレッドシート連携の設定をご確認ください。');
   }
   loaded = true;
   render();
@@ -173,11 +178,25 @@ async function loadTasks(){
 
 async function saveTasks(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    setSyncStatus('saving');
+    await fetch(SHEET_API_URL, {
+      method: 'POST',
+      body: JSON.stringify(tasks)
+    });
+    setSyncStatus('saved');
   }catch(e){
     console.error('save failed', e);
-    alert('保存に失敗しました（ブラウザのストレージが満杯/無効になっている可能性があります）');
+    setSyncStatus('error');
+    alert('保存に失敗しました（通信エラー）。もう一度お試しください。');
   }
+}
+
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(state === 'saving') el.textContent = '保存中...';
+  else if(state === 'saved') el.textContent = '保存済み';
+  else if(state === 'error') el.textContent = '保存エラー';
 }
 
 function daysUntil(dateStr){
@@ -342,7 +361,7 @@ function render(){
   app.innerHTML = `
     <header>
       <h1>進捗トラッカー</h1>
-      <span class="sub">全${tasks.length}件 / このブラウザに保存</span>
+      <span class="sub">全${tasks.length}件 / <span id="syncStatus">スプレッドシートに保存</span></span>
     </header>
     ${renderToolbar()}
     ${list.length === 0
