@@ -108,8 +108,10 @@
   .log-entry{font-size:12.5px;margin-bottom:6px;display:flex;gap:8px;}
   .log-entry .ldate{font-family:var(--mono);color:var(--ink-soft);white-space:nowrap;}
   .log-add{display:flex;gap:6px;margin-top:8px;}
-  .log-add input{flex:1;font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .log-add input[type=text]{flex:1;font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .log-add input.log-pct-input{width:64px;flex:none;font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
   .log-add button{font-size:12px;border:none;background:var(--ink);color:white;border-radius:6px;padding:6px 10px;cursor:pointer;}
+  .log-pct{font-family:var(--mono);font-size:11px;background:var(--teal-soft);color:var(--teal);padding:1px 6px;border-radius:10px;white-space:nowrap;}
 
   /* modal */
   .overlay{
@@ -186,14 +188,16 @@ function daysUntil(dateStr){
 
 function computeProgress(t){
   if(t.status === 'done') return 100;
-  if(!t.startDate || !t.endDate) return t.status === 'doing' ? 30 : 5;
-  const start = new Date(t.startDate).getTime();
-  const end = new Date(t.endDate).getTime();
-  const now = new Date(todayStr()).getTime();
-  if(end <= start) return t.status==='doing'?50:5;
-  let pct = ((now - start) / (end - start)) * 100;
-  pct = Math.max(2, Math.min(100, pct));
-  return Math.round(pct);
+  const logs = t.logs || [];
+  if(logs.length > 0){
+    // 最新の「進捗%」が入った記録を使う
+    for(let i = logs.length - 1; i >= 0; i--){
+      if(typeof logs[i].progress === 'number'){
+        return Math.max(0, Math.min(100, logs[i].progress));
+      }
+    }
+  }
+  return t.status === 'doing' ? 10 : 0;
 }
 
 function deadlineState(t){
@@ -314,10 +318,11 @@ function renderCard(t){
       <div class="log-list">
         ${logs.length === 0 ? '<div style="font-size:12px;color:var(--ink-soft)">まだ記録がありません</div>' : ''}
         ${logs.slice().reverse().map(l => `
-          <div class="log-entry"><span class="ldate">${l.date}</span><span>${escapeHtml(l.note)}</span></div>
+          <div class="log-entry"><span class="ldate">${l.date}</span>${typeof l.progress==='number' ? `<span class="log-pct">${l.progress}%</span>` : ''}<span>${escapeHtml(l.note)}</span></div>
         `).join('')}
         <div class="log-add">
           <input type="text" placeholder="今日やったことを記録..." data-loginput="${t.id}" />
+          <input type="number" min="0" max="100" step="5" placeholder="進捗%" class="log-pct-input" data-pctinput="${t.id}" value="${progress}" />
           <button data-action="addLog">記録</button>
         </div>
       </div>
@@ -375,21 +380,29 @@ function attachEvents(){
     if(addLogBtn){
       addLogBtn.addEventListener('click', () => addLog(id));
       const input = card.querySelector(`[data-loginput="${id}"]`);
-      if(input){
-        input.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
-      }
+      const pctInput = card.querySelector(`[data-pctinput="${id}"]`);
+      if(input) input.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
+      if(pctInput) pctInput.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
     }
   });
 }
 
 async function addLog(id){
   const input = document.querySelector(`[data-loginput="${id}"]`);
+  const pctInput = document.querySelector(`[data-pctinput="${id}"]`);
   if(!input || !input.value.trim()) return;
   const t = tasks.find(x => x.id === id);
   if(!t) return;
   t.logs = t.logs || [];
-  t.logs.push({date: todayStr(), note: input.value.trim()});
+  let progress = pctInput && pctInput.value !== '' ? parseInt(pctInput.value, 10) : null;
+  if(progress !== null){
+    progress = Math.max(0, Math.min(100, progress));
+  }
+  const entry = {date: todayStr(), note: input.value.trim()};
+  if(progress !== null) entry.progress = progress;
+  t.logs.push(entry);
   if(t.status === 'todo') t.status = 'doing';
+  if(progress === 100 && t.status !== 'done') t.status = 'done';
   await saveTasks();
   render();
 }
