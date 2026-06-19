@@ -162,8 +162,8 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 async function loadTasks(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    tasks = res ? JSON.parse(res.value) : [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    tasks = raw ? JSON.parse(raw) : [];
   }catch(e){
     tasks = [];
   }
@@ -173,9 +173,10 @@ async function loadTasks(){
 
 async function saveTasks(){
   try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify(tasks), true);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   }catch(e){
     console.error('save failed', e);
+    alert('保存に失敗しました（ブラウザのストレージが満杯/無効になっている可能性があります）');
   }
 }
 
@@ -341,7 +342,7 @@ function render(){
   app.innerHTML = `
     <header>
       <h1>進捗トラッカー</h1>
-      <span class="sub">全${tasks.length}件 / 共有保存</span>
+      <span class="sub">全${tasks.length}件 / このブラウザに保存</span>
     </header>
     ${renderToolbar()}
     ${list.length === 0
