@@ -73,6 +73,7 @@
   }
   .tag.work{background:var(--teal-soft);color:var(--teal);}
   .tag.private{background:#ddd6f3;color:#5d4b9c;}
+  .tag.assignee{background:var(--gray-soft);color:var(--ink);font-weight:600;}
   .status{
     font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;font-family:var(--mono);
   }
@@ -146,9 +147,14 @@
 
 <script>
 const STORAGE_KEY = 'tasks';
+
+// 担当者リスト：ここを編集して使うメンバーの名前に変更してください
+const MEMBERS = ['高樋', '久山', 'メンバー3'];
+
 let tasks = [];
 let filterCategory = 'all';
 let filterStatus = 'all';
+let filterAssignee = 'all';
 let searchText = '';
 let sortMode = 'deadline';
 let openLogIds = new Set();
@@ -236,8 +242,9 @@ function filteredSortedTasks(){
   let list = tasks.filter(t => {
     if(filterCategory !== 'all' && t.category !== filterCategory) return false;
     if(filterStatus !== 'all' && t.status !== filterStatus) return false;
+    if(filterAssignee !== 'all' && t.assignee !== filterAssignee) return false;
     if(searchText){
-      const hay = [t.name, t.nextAction, ...(t.logs||[]).map(l=>l.note)].join(' ').toLowerCase();
+      const hay = [t.name, t.assignee, t.nextAction, ...(t.logs||[]).map(l=>l.note)].join(' ').toLowerCase();
       if(!hay.includes(searchText.toLowerCase())) return false;
     }
     return true;
@@ -278,6 +285,10 @@ function renderToolbar(){
         <option value="hold" ${filterStatus==='hold'?'selected':''}>保留中</option>
         <option value="done" ${filterStatus==='done'?'selected':''}>完了</option>
       </select>
+      <select id="assigneeFilter">
+        <option value="all" ${filterAssignee==='all'?'selected':''}>すべての担当者</option>
+        ${MEMBERS.map(m => `<option value="${escapeHtml(m)}" ${filterAssignee===m?'selected':''}>${escapeHtml(m)}</option>`).join('')}
+      </select>
       <select id="sortMode">
         <option value="deadline" ${sortMode==='deadline'?'selected':''}>締切が近い順</option>
         <option value="status" ${sortMode==='status'?'selected':''}>ステータス順</option>
@@ -316,6 +327,7 @@ function renderCard(t){
         <div class="name">${escapeHtml(t.name)}</div>
         <div class="meta-line">
           <span class="tag ${t.category}">${t.category==='work'?'仕事':'プライベート'}</span>
+          ${t.assignee ? `<span class="tag assignee">${escapeHtml(t.assignee)}</span>` : ''}
           <span class="status ${t.status}">${STATUS_LABEL[t.status]}</span>
           ${dateText ? `<span class="dates ${dateClass}">${escapeHtml(dateText)}</span>` : ''}
         </div>
@@ -383,6 +395,8 @@ function attachEvents(){
   if(catFilter) catFilter.addEventListener('change', e => { filterCategory = e.target.value; render(); });
   const statusFilter = document.getElementById('statusFilter');
   if(statusFilter) statusFilter.addEventListener('change', e => { filterStatus = e.target.value; render(); });
+  const assigneeFilter = document.getElementById('assigneeFilter');
+  if(assigneeFilter) assigneeFilter.addEventListener('change', e => { filterAssignee = e.target.value; render(); });
   const sortSel = document.getElementById('sortMode');
   if(sortSel) sortSel.addEventListener('change', e => { sortMode = e.target.value; render(); });
   const newBtn = document.getElementById('newTaskBtn');
@@ -432,7 +446,7 @@ async function deleteTask(id){
 
 function openModal(id){
   const editing = id ? tasks.find(t => t.id === id) : null;
-  const t = editing || {id: uid(), name:'', category:'work', status:'todo', startDate: todayStr(), endDate:'', nextAction:'', logs:[]};
+  const t = editing || {id: uid(), name:'', category:'work', status:'todo', assignee: MEMBERS[0], startDate: todayStr(), endDate:'', nextAction:'', logs:[]};
 
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
@@ -452,14 +466,20 @@ function openModal(id){
           </select>
         </div>
         <div class="field">
-          <label>ステータス</label>
-          <select id="m_status">
-            <option value="todo" ${t.status==='todo'?'selected':''}>未着手</option>
-            <option value="doing" ${t.status==='doing'?'selected':''}>進行中</option>
-            <option value="hold" ${t.status==='hold'?'selected':''}>保留中</option>
-            <option value="done" ${t.status==='done'?'selected':''}>完了</option>
+          <label>担当者</label>
+          <select id="m_assignee">
+            ${MEMBERS.map(m => `<option value="${escapeHtml(m)}" ${t.assignee===m?'selected':''}>${escapeHtml(m)}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label>ステータス</label>
+        <select id="m_status">
+          <option value="todo" ${t.status==='todo'?'selected':''}>未着手</option>
+          <option value="doing" ${t.status==='doing'?'selected':''}>進行中</option>
+          <option value="hold" ${t.status==='hold'?'selected':''}>保留中</option>
+          <option value="done" ${t.status==='done'?'selected':''}>完了</option>
+        </select>
       </div>
       <div class="row2">
         <div class="field">
@@ -491,6 +511,7 @@ function openModal(id){
     if(!name){ alert('タスク名を入力してください'); return; }
     t.name = name;
     t.category = document.getElementById('m_category').value;
+    t.assignee = document.getElementById('m_assignee').value;
     t.status = document.getElementById('m_status').value;
     t.startDate = document.getElementById('m_start').value;
     t.endDate = document.getElementById('m_end').value;
