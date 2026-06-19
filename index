@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>進捗トラッカー</title>
+<style>
+  :root{
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --ink: #1f2421;
+    --ink-soft: #5b6460;
+    --line: #e2ddd2;
+    --teal: #2f6f63;
+    --teal-soft: #cfe3dd;
+    --amber: #c9742f;
+    --amber-soft: #f5e0c9;
+    --red: #b3433a;
+    --red-soft: #f3d9d5;
+    --gray-soft: #ece9e1;
+    --mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --sans: 'Avenir Next', 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px;}
+  header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;flex-wrap:wrap;gap:8px;}
+  h1{font-size:22px;letter-spacing:0.02em;margin:0;font-weight:700;}
+  .sub{font-size:12px;color:var(--ink-soft);font-family:var(--mono);}
+
+  .toolbar{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  }
+  .toolbar input[type=text]{
+    flex:1;min-width:140px;border:none;background:transparent;font-size:14px;outline:none;color:var(--ink);
+  }
+  .toolbar select, .chip{
+    border:1px solid var(--line);background:var(--gray-soft);border-radius:7px;
+    font-size:12px;padding:6px 9px;color:var(--ink-soft);cursor:pointer;font-family:var(--sans);
+  }
+  .chip.active{background:var(--teal);color:white;border-color:var(--teal);}
+  .btn-new{
+    background:var(--ink);color:white;border:none;border-radius:7px;
+    padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;
+  }
+  .btn-new:hover{opacity:0.85;}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);
+    border:1px dashed var(--line);border-radius:12px;background:var(--panel);
+  }
+
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin-bottom:12px;position:relative;
+    transition:box-shadow .15s;
+  }
+  .card:hover{box-shadow:0 2px 10px rgba(0,0,0,0.04);}
+  .card.deadline-near{border-color:var(--amber);}
+  .card.deadline-over{border-color:var(--red);}
+
+  .card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+  .name{font-size:16px;font-weight:700;margin:0 0 4px;}
+  .meta-line{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .tag{
+    font-size:11px;padding:2px 8px;border-radius:20px;font-family:var(--mono);
+  }
+  .tag.work{background:var(--teal-soft);color:var(--teal);}
+  .tag.private{background:#ddd6f3;color:#5d4b9c;}
+  .status{
+    font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;font-family:var(--mono);
+  }
+  .status.todo{background:var(--gray-soft);color:var(--ink-soft);}
+  .status.doing{background:var(--teal-soft);color:var(--teal);}
+  .status.hold{background:var(--amber-soft);color:var(--amber);}
+  .status.done{background:#dceedb;color:#3a7a3f;}
+  .dates{font-size:11.5px;color:var(--ink-soft);font-family:var(--mono);}
+  .dates.warn{color:var(--amber);font-weight:600;}
+  .dates.over{color:var(--red);font-weight:600;}
+
+  .progress-track{height:7px;border-radius:5px;background:var(--gray-soft);overflow:hidden;margin-bottom:10px;}
+  .progress-fill{height:100%;border-radius:5px;background:var(--teal);transition:width .3s;}
+  .progress-fill.hold{background:var(--amber);}
+  .progress-fill.done{background:#3a7a3f;}
+  .progress-fill.over{background:var(--red);}
+
+  .next-action{
+    font-size:13px;background:var(--amber-soft);color:#7a4a18;border-radius:8px;
+    padding:8px 10px;margin-bottom:8px;display:flex;gap:6px;
+  }
+  .next-action b{white-space:nowrap;}
+
+  .card-actions{display:flex;gap:8px;}
+  .icon-btn{
+    border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:13px;
+    padding:4px 8px;border-radius:6px;
+  }
+  .icon-btn:hover{background:var(--gray-soft);color:var(--ink);}
+
+  .log-toggle{font-size:12px;color:var(--teal);cursor:pointer;font-family:var(--mono);}
+  .log-list{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;}
+  .log-entry{font-size:12.5px;margin-bottom:6px;display:flex;gap:8px;}
+  .log-entry .ldate{font-family:var(--mono);color:var(--ink-soft);white-space:nowrap;}
+  .log-add{display:flex;gap:6px;margin-top:8px;}
+  .log-add input{flex:1;font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;}
+  .log-add button{font-size:12px;border:none;background:var(--ink);color:white;border-radius:6px;padding:6px 10px;cursor:pointer;}
+
+  /* modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(20,20,18,0.4);display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:20px;
+  }
+  .modal{
+    background:var(--panel);border-radius:14px;padding:24px;width:100%;max-width:460px;
+    max-height:88vh;overflow:auto;
+  }
+  .modal h2{margin:0 0 14px;font-size:17px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;font-family:var(--mono);}
+  .field input, .field select, .field textarea{
+    width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:14px;
+    font-family:var(--sans);background:var(--bg);color:var(--ink);
+  }
+  .row2{display:flex;gap:10px;}
+  .row2 > div{flex:1;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+  .modal-actions button{border:none;border-radius:7px;padding:9px 16px;font-size:13px;cursor:pointer;}
+  .btn-cancel{background:var(--gray-soft);color:var(--ink-soft);}
+  .btn-save{background:var(--ink);color:white;font-weight:600;}
+
+  .loading{text-align:center;padding:60px;color:var(--ink-soft);font-family:var(--mono);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading">読み込み中...</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'tasks';
+let tasks = [];
+let filterCategory = 'all';
+let filterStatus = 'all';
+let searchText = '';
+let sortMode = 'deadline';
+let openLogIds = new Set();
+let loaded = false;
+
+const STATUS_LABEL = {todo:'未着手', doing:'進行中', hold:'保留中', done:'完了'};
+const STATUS_ORDER = {doing:0, todo:1, hold:2, done:3};
+
+function uid(){ return 't' + Date.now() + Math.random().toString(36).slice(2,8); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+async function loadTasks(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    tasks = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    tasks = [];
+  }
+  loaded = true;
+  render();
+}
+
+async function saveTasks(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(tasks), true);
+  }catch(e){
+    console.error('save failed', e);
+  }
+}
+
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const today = new Date(todayStr());
+  const d = new Date(dateStr);
+  return Math.round((d - today) / 86400000);
+}
+
+function computeProgress(t){
+  if(t.status === 'done') return 100;
+  if(!t.startDate || !t.endDate) return t.status === 'doing' ? 30 : 5;
+  const start = new Date(t.startDate).getTime();
+  const end = new Date(t.endDate).getTime();
+  const now = new Date(todayStr()).getTime();
+  if(end <= start) return t.status==='doing'?50:5;
+  let pct = ((now - start) / (end - start)) * 100;
+  pct = Math.max(2, Math.min(100, pct));
+  return Math.round(pct);
+}
+
+function deadlineState(t){
+  if(t.status === 'done' || !t.endDate) return 'none';
+  const d = daysUntil(t.endDate);
+  if(d < 0) return 'over';
+  if(d <= 3) return 'near';
+  return 'none';
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function filteredSortedTasks(){
+  let list = tasks.filter(t => {
+    if(filterCategory !== 'all' && t.category !== filterCategory) return false;
+    if(filterStatus !== 'all' && t.status !== filterStatus) return false;
+    if(searchText){
+      const hay = [t.name, t.nextAction, ...(t.logs||[]).map(l=>l.note)].join(' ').toLowerCase();
+      if(!hay.includes(searchText.toLowerCase())) return false;
+    }
+    return true;
+  });
+  list.sort((a,b) => {
+    if(sortMode === 'deadline'){
+      const ad = a.endDate ? new Date(a.endDate).getTime() : Infinity;
+      const bd = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+      return ad - bd;
+    }
+    if(sortMode === 'status'){
+      return (STATUS_ORDER[a.status]??9) - (STATUS_ORDER[b.status]??9);
+    }
+    if(sortMode === 'name'){
+      return a.name.localeCompare(b.name, 'ja');
+    }
+    if(sortMode === 'progress'){
+      return computeProgress(b) - computeProgress(a);
+    }
+    return 0;
+  });
+  return list;
+}
+
+function renderToolbar(){
+  return `
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="検索（タスク名・メモ）" value="${escapeHtml(searchText)}" />
+      <select id="catFilter">
+        <option value="all" ${filterCategory==='all'?'selected':''}>すべてのタグ</option>
+        <option value="work" ${filterCategory==='work'?'selected':''}>仕事</option>
+        <option value="private" ${filterCategory==='private'?'selected':''}>プライベート</option>
+      </select>
+      <select id="statusFilter">
+        <option value="all" ${filterStatus==='all'?'selected':''}>すべてのステータス</option>
+        <option value="todo" ${filterStatus==='todo'?'selected':''}>未着手</option>
+        <option value="doing" ${filterStatus==='doing'?'selected':''}>進行中</option>
+        <option value="hold" ${filterStatus==='hold'?'selected':''}>保留中</option>
+        <option value="done" ${filterStatus==='done'?'selected':''}>完了</option>
+      </select>
+      <select id="sortMode">
+        <option value="deadline" ${sortMode==='deadline'?'selected':''}>締切が近い順</option>
+        <option value="status" ${sortMode==='status'?'selected':''}>ステータス順</option>
+        <option value="progress" ${sortMode==='progress'?'selected':''}>進捗順</option>
+        <option value="name" ${sortMode==='name'?'selected':''}>名前順</option>
+      </select>
+      <button class="btn-new" id="newTaskBtn">+ 新規タスク</button>
+    </div>
+  `;
+}
+
+function renderCard(t){
+  const progress = computeProgress(t);
+  const dstate = deadlineState(t);
+  const cardClass = dstate === 'over' ? 'deadline-over' : (dstate === 'near' ? 'deadline-near' : '');
+  const dateClass = dstate === 'over' ? 'over' : (dstate === 'near' ? 'warn' : '');
+  const fillClass = t.status==='done' ? 'done' : (dstate==='over' ? 'over' : (t.status==='hold' ? 'hold' : ''));
+  const dleft = daysUntil(t.endDate);
+  let dateText = '';
+  if(t.startDate || t.endDate){
+    dateText = `${t.startDate||'?'} 〜 ${t.endDate||'?'}`;
+    if(t.status !== 'done' && t.endDate){
+      if(dleft < 0) dateText += ` (期限切れ ${Math.abs(dleft)}日)`;
+      else if(dleft === 0) dateText += ` (今日が期限)`;
+      else dateText += ` (あと${dleft}日)`;
+    }
+  }
+  const logs = t.logs || [];
+  const logsOpen = openLogIds.has(t.id);
+  const lastLog = logs.length ? logs[logs.length-1] : null;
+
+  return `
+  <div class="card ${cardClass}" data-id="${t.id}">
+    <div class="card-top">
+      <div style="flex:1">
+        <div class="name">${escapeHtml(t.name)}</div>
+        <div class="meta-line">
+          <span class="tag ${t.category}">${t.category==='work'?'仕事':'プライベート'}</span>
+          <span class="status ${t.status}">${STATUS_LABEL[t.status]}</span>
+          ${dateText ? `<span class="dates ${dateClass}">${escapeHtml(dateText)}</span>` : ''}
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn" data-action="edit">編集</button>
+        <button class="icon-btn" data-action="delete">削除</button>
+      </div>
+    </div>
+
+    <div class="progress-track"><div class="progress-fill ${fillClass}" style="width:${progress}%"></div></div>
+
+    ${t.nextAction ? `<div class="next-action"><b>次にやること:</b> <span>${escapeHtml(t.nextAction)}</span></div>` : ''}
+
+    <div class="log-toggle" data-action="toggleLog">
+      ${logsOpen ? '▾ 進捗ログを隠す' : `▸ 進捗ログを見る（${logs.length}件${lastLog ? ' / 最新: ' + lastLog.date : ''}）`}
+    </div>
+
+    ${logsOpen ? `
+      <div class="log-list">
+        ${logs.length === 0 ? '<div style="font-size:12px;color:var(--ink-soft)">まだ記録がありません</div>' : ''}
+        ${logs.slice().reverse().map(l => `
+          <div class="log-entry"><span class="ldate">${l.date}</span><span>${escapeHtml(l.note)}</span></div>
+        `).join('')}
+        <div class="log-add">
+          <input type="text" placeholder="今日やったことを記録..." data-loginput="${t.id}" />
+          <button data-action="addLog">記録</button>
+        </div>
+      </div>
+    ` : ''}
+  </div>
+  `;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(!loaded){
+    app.innerHTML = '<div class="loading">読み込み中...</div>';
+    return;
+  }
+  const list = filteredSortedTasks();
+  app.innerHTML = `
+    <header>
+      <h1>進捗トラッカー</h1>
+      <span class="sub">全${tasks.length}件 / 共有保存</span>
+    </header>
+    ${renderToolbar()}
+    ${list.length === 0
+      ? `<div class="empty">${tasks.length===0 ? 'タスクがまだありません。「+ 新規タスク」で追加してください。' : '条件に一致するタスクがありません。'}</div>`
+      : list.map(renderCard).join('')}
+  `;
+  attachEvents();
+}
+
+function attachEvents(){
+  const search = document.getElementById('search');
+  if(search){
+    search.addEventListener('input', e => { searchText = e.target.value; render(); 
+      // restore focus
+      setTimeout(()=>{ const s=document.getElementById('search'); if(s){ s.focus(); s.setSelectionRange(s.value.length, s.value.length); } },0);
+    });
+  }
+  const catFilter = document.getElementById('catFilter');
+  if(catFilter) catFilter.addEventListener('change', e => { filterCategory = e.target.value; render(); });
+  const statusFilter = document.getElementById('statusFilter');
+  if(statusFilter) statusFilter.addEventListener('change', e => { filterStatus = e.target.value; render(); });
+  const sortSel = document.getElementById('sortMode');
+  if(sortSel) sortSel.addEventListener('change', e => { sortMode = e.target.value; render(); });
+  const newBtn = document.getElementById('newTaskBtn');
+  if(newBtn) newBtn.addEventListener('click', () => openModal());
+
+  document.querySelectorAll('.card').forEach(card => {
+    const id = card.dataset.id;
+    card.querySelector('[data-action="edit"]').addEventListener('click', () => openModal(id));
+    card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteTask(id));
+    card.querySelector('[data-action="toggleLog"]').addEventListener('click', () => {
+      if(openLogIds.has(id)) openLogIds.delete(id); else openLogIds.add(id);
+      render();
+    });
+    const addLogBtn = card.querySelector('[data-action="addLog"]');
+    if(addLogBtn){
+      addLogBtn.addEventListener('click', () => addLog(id));
+      const input = card.querySelector(`[data-loginput="${id}"]`);
+      if(input){
+        input.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
+      }
+    }
+  });
+}
+
+async function addLog(id){
+  const input = document.querySelector(`[data-loginput="${id}"]`);
+  if(!input || !input.value.trim()) return;
+  const t = tasks.find(x => x.id === id);
+  if(!t) return;
+  t.logs = t.logs || [];
+  t.logs.push({date: todayStr(), note: input.value.trim()});
+  if(t.status === 'todo') t.status = 'doing';
+  await saveTasks();
+  render();
+}
+
+async function deleteTask(id){
+  if(!confirm('このタスクを削除しますか？')) return;
+  tasks = tasks.filter(t => t.id !== id);
+  await saveTasks();
+  render();
+}
+
+function openModal(id){
+  const editing = id ? tasks.find(t => t.id === id) : null;
+  const t = editing || {id: uid(), name:'', category:'work', status:'todo', startDate: todayStr(), endDate:'', nextAction:'', logs:[]};
+
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>${editing ? 'タスクを編集' : '新規タスク'}</h2>
+      <div class="field">
+        <label>タスク名</label>
+        <input type="text" id="m_name" value="${escapeHtml(t.name)}" placeholder="例: 資料作成" />
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>タグ</label>
+          <select id="m_category">
+            <option value="work" ${t.category==='work'?'selected':''}>仕事</option>
+            <option value="private" ${t.category==='private'?'selected':''}>プライベート</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ステータス</label>
+          <select id="m_status">
+            <option value="todo" ${t.status==='todo'?'selected':''}>未着手</option>
+            <option value="doing" ${t.status==='doing'?'selected':''}>進行中</option>
+            <option value="hold" ${t.status==='hold'?'selected':''}>保留中</option>
+            <option value="done" ${t.status==='done'?'selected':''}>完了</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>開始日（目安）</label>
+          <input type="date" id="m_start" value="${t.startDate||''}" />
+        </div>
+        <div class="field">
+          <label>終了日（目安）</label>
+          <input type="date" id="m_end" value="${t.endDate||''}" />
+        </div>
+      </div>
+      <div class="field">
+        <label>次にやること（次回開いた時に表示）</label>
+        <textarea id="m_next" rows="2" placeholder="例: Bさんからの返信を確認してから続きを書く">${escapeHtml(t.nextAction)}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="m_cancel">キャンセル</button>
+        <button class="btn-save" id="m_save">${editing ? '保存' : '追加'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('m_cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+
+  document.getElementById('m_save').addEventListener('click', async () => {
+    const name = document.getElementById('m_name').value.trim();
+    if(!name){ alert('タスク名を入力してください'); return; }
+    t.name = name;
+    t.category = document.getElementById('m_category').value;
+    t.status = document.getElementById('m_status').value;
+    t.startDate = document.getElementById('m_start').value;
+    t.endDate = document.getElementById('m_end').value;
+    t.nextAction = document.getElementById('m_next').value.trim();
+    t.logs = t.logs || [];
+
+    if(!editing){
+      tasks.push(t);
+    }
+    await saveTasks();
+    overlay.remove();
+    render();
+  });
+}
+
+loadTasks();
+</script>
+</body>
+</html>
