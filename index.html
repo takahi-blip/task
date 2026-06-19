@@ -399,10 +399,6 @@ function attachEvents(){
     const addLogBtn = card.querySelector('[data-action="addLog"]');
     if(addLogBtn){
       addLogBtn.addEventListener('click', () => addLog(id));
-      const input = card.querySelector(`[data-loginput="${id}"]`);
-      const pctInput = card.querySelector(`[data-pctinput="${id}"]`);
-      if(input) input.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
-      if(pctInput) pctInput.addEventListener('keydown', e => { if(e.key==='Enter') addLog(id); });
     }
   });
 }
