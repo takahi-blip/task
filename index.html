@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.png">
 <title>進捗トラッカー</title>
 <style>
@@ -149,8 +150,17 @@
 <script>
 const STORAGE_KEY = 'tasks';
 
+// 合言葉のハッシュ：下の手順で作ったハッシュ値に書き換えてください
+const PASSCODE_HASH = '3decd4ab19dee100b40b5ec12d04da2f15fe15367564bb000424faa47bacf2ab';
+const UNLOCK_KEY = 'tt_unlocked';
+
+async function sha256(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 // 担当者リスト：ここを編集して使うメンバーの名前に変更してください
-const MEMBERS = ['高樋', '久山', 'メンバー3'];
+const MEMBERS = ['自分', 'メンバー2', 'メンバー3'];
 
 let tasks = [];
 let filterCategory = 'all';
@@ -528,7 +538,46 @@ function openModal(id){
   });
 }
 
-loadTasks();
+function checkUnlocked(){
+  return localStorage.getItem(UNLOCK_KEY) === 'yes';
+}
+
+function showGate(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="max-width:340px;margin:120px auto;text-align:center;">
+      <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+      <div style="font-size:14px;color:var(--ink-soft);margin-bottom:14px;">合言葉を入力してください</div>
+      <input type="password" id="gate_input" placeholder="合言葉"
+        style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;text-align:center;margin-bottom:10px;" />
+      <button id="gate_btn" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--ink);color:white;font-weight:600;cursor:pointer;">入る</button>
+      <div id="gate_err" style="color:var(--red);font-size:12px;margin-top:8px;height:14px;"></div>
+    </div>
+  `;
+  const input = document.getElementById('gate_input');
+  const btn = document.getElementById('gate_btn');
+  const err = document.getElementById('gate_err');
+  const tryUnlock = async () => {
+    const hash = await sha256(input.value);
+    if(hash === PASSCODE_HASH){
+      localStorage.setItem(UNLOCK_KEY, 'yes');
+      loadTasks();
+    }else{
+      err.textContent = '合言葉が違います';
+      input.value = '';
+      input.focus();
+    }
+  };
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') tryUnlock(); });
+  input.focus();
+}
+
+if(checkUnlocked()){
+  loadTasks();
+}else{
+  showGate();
+}
 </script>
 </body>
 </html>
