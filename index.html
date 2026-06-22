@@ -30,7 +30,18 @@
     font-family:var(--sans);
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px;}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px;}
+  .layout{display:flex;gap:22px;align-items:flex-start;}
+  .sidebar{width:148px;flex:none;display:flex;flex-direction:column;gap:4px;}
+  .sidebar-tab{
+    text-align:left;border:none;background:transparent;padding:9px 12px;border-radius:8px;
+    font-size:13.5px;color:var(--ink-soft);cursor:pointer;font-family:var(--sans);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .sidebar-tab:hover{background:var(--gray-soft);}
+  .sidebar-tab.active{background:var(--ink);color:white;font-weight:600;}
+  .sidebar-tab .count{font-size:11px;font-family:var(--mono);opacity:0.7;}
+  .main-col{flex:1;min-width:0;}
   header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px;flex-wrap:wrap;gap:8px;}
   h1{font-size:22px;letter-spacing:0.02em;margin:0;font-weight:700;}
   .sub{font-size:12px;color:var(--ink-soft);font-family:var(--mono);}
@@ -296,10 +307,6 @@ function renderToolbar(){
         <option value="hold" ${filterStatus==='hold'?'selected':''}>保留中</option>
         <option value="done" ${filterStatus==='done'?'selected':''}>完了</option>
       </select>
-      <select id="assigneeFilter">
-        <option value="all" ${filterAssignee==='all'?'selected':''}>すべての担当者</option>
-        ${MEMBERS.map(m => `<option value="${escapeHtml(m)}" ${filterAssignee===m?'selected':''}>${escapeHtml(m)}</option>`).join('')}
-      </select>
       <select id="sortMode">
         <option value="deadline" ${sortMode==='deadline'?'selected':''}>締切が近い順</option>
         <option value="status" ${sortMode==='status'?'selected':''}>ステータス順</option>
@@ -374,6 +381,21 @@ function renderCard(t){
   `;
 }
 
+function renderSidebar(){
+  const tabs = [{key:'all', label:'すべて'}, ...MEMBERS.map(m => ({key:m, label:m}))];
+  return `
+    <div class="sidebar">
+      ${tabs.map(tab => {
+        const count = tab.key === 'all' ? tasks.length : tasks.filter(t => t.assignee === tab.key).length;
+        const active = filterAssignee === tab.key;
+        return `<button class="sidebar-tab ${active?'active':''}" data-assignee="${escapeHtml(tab.key)}">
+          <span>${escapeHtml(tab.label)}</span><span class="count">${count}</span>
+        </button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
 function render(){
   const app = document.getElementById('app');
   if(!loaded){
@@ -386,10 +408,15 @@ function render(){
       <h1>進捗トラッカー</h1>
       <span class="sub">全${tasks.length}件 / <span id="syncStatus">スプレッドシートに保存</span></span>
     </header>
-    ${renderToolbar()}
-    ${list.length === 0
-      ? `<div class="empty">${tasks.length===0 ? 'タスクがまだありません。「+ 新規タスク」で追加してください。' : '条件に一致するタスクがありません。'}</div>`
-      : list.map(renderCard).join('')}
+    <div class="layout">
+      ${renderSidebar()}
+      <div class="main-col">
+        ${renderToolbar()}
+        ${list.length === 0
+          ? `<div class="empty">${tasks.length===0 ? 'タスクがまだありません。「+ 新規タスク」で追加してください。' : '条件に一致するタスクがありません。'}</div>`
+          : list.map(renderCard).join('')}
+      </div>
+    </div>
   `;
   attachEvents();
 }
@@ -406,8 +433,9 @@ function attachEvents(){
   if(catFilter) catFilter.addEventListener('change', e => { filterCategory = e.target.value; render(); });
   const statusFilter = document.getElementById('statusFilter');
   if(statusFilter) statusFilter.addEventListener('change', e => { filterStatus = e.target.value; render(); });
-  const assigneeFilter = document.getElementById('assigneeFilter');
-  if(assigneeFilter) assigneeFilter.addEventListener('change', e => { filterAssignee = e.target.value; render(); });
+  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => { filterAssignee = tab.dataset.assignee; render(); });
+  });
   const sortSel = document.getElementById('sortMode');
   if(sortSel) sortSel.addEventListener('change', e => { sortMode = e.target.value; render(); });
   const newBtn = document.getElementById('newTaskBtn');
